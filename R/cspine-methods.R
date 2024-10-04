@@ -24,13 +24,25 @@ coef.cspine <- function(fit) {
 #' @export
 predict.cspine <- function(fit, u) {
   q <- dim(fit$gamma)[2]
-  dim(u) <- NULL
+  u <- as.numeric(u)
   if (length(u) != q) {
     stop("Expected covariate vector of length ", q, ".")
   }
   omega <- apply(fit$beta, c(1, 2), \(b) b %*% c(1, u))
   diag(omega) <- 1 / fit$sigma2
-
-  mu <- solve(diag(fit$sigma2) %*% omega, fit$gamma %*% u)
+  omega <- Matrix::Diagonal(x = fit$sigma2) %*% omega
+  eps <- 1e-10 # ensure stable inversion for prediction
+  while (TRUE) {
+    tryCatch(
+      {
+        solve(omega + eps * diag(nrow(omega)))
+        break
+      },
+      error = function(e) {
+        eps <- eps * 10
+      }
+    )
+  }
+  mu <- solve(omega + eps * diag(nrow(omega)), fit$gamma %*% u)
   return(list(precision = omega, mean = mu))
 }
