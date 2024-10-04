@@ -1,0 +1,15 @@
+Package: cspine
+Type: Package
+Title: Covariate-adjusted Sparse Precision matrix with Natural Estimation
+Version: 0.1
+Authors@R:
+    person("Robin", "Liu", , "r_liu@pstat.ucsb.edu", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0003-1628-5226"))
+Maintainer: Robin Liu <r_liu@pstat.ucsb.edu>
+Description: Convex neighborhood selection for precision matrix estimation with covariate adjustment.
+License: MIT + file LICENSE
+Imports: Matrix, sparsegl
+Suggests: parallel
+RoxygenNote: 7.3.2
+Encoding: UTF-8
+NeedsCompilation: no

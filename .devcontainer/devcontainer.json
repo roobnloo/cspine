@@ -1,0 +1,37 @@
+{
+    "name": "cspine-dev",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "options": [
+            "--format=docker"
+        ] // required for Podman, remove line if using Docker
+    },
+    "forwardPorts": [
+        8787
+    ], // Port forwarding for RStudio or other services
+    "containerUser": "rstudio", // You can specify a non-root user if needed
+    "mounts": [
+        "source=${localWorkspaceFolder},target=/home/rstudio/work,type=bind,z" // Mount your local workspace into the container
+    ],
+    "runArgs": [
+        "--user=1000:100",
+        "--userns=keep-id:uid=1000,gid=100" // required for Podman, remove line if using Docker
+    ],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "reditorsupport.r",
+                "RDebugger.r-debugger",
+                "gruntfuggly.todo-tree"
+            ],
+            "settings": {
+                "r.rterm.linux": "/usr/local/bin/radian",
+                "r.lsp.path": "/usr/local/bin/R",
+                "r.sessionWatcher": true,
+                "r.plot.useHttpgd": true,
+                "r.bracketedPaste": true
+            }
+        }
+    },
+    "workspaceFolder": "/home/rstudio/work"
+}
