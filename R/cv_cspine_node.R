@@ -1,5 +1,5 @@
 cv_cspine_node <- function(y, uw, p, q, nlambda, lam_max, lambda_factor, alpha,
-                          maxit, tol, nfolds) {
+                           maxit, tol, nfolds) {
   n <- length(y)
   nvars <- q + (p - 1) * (q + 1)
   nalpha <- length(alpha)
@@ -39,7 +39,10 @@ cv_cspine_node <- function(y, uw, p, q, nlambda, lam_max, lambda_factor, alpha,
   alpha_min_ind <- cv_ind[2]
   gamma <- coefs[1:q, alpha_min_ind]
   beta <- coefs[(q + 1):nvars, alpha_min_ind]
-  nnz <- sum(abs(beta) > 0) - 1
+
+  # Compute nnz based on largest magnitude coefficients
+  bcs <- cumsum(sort(abs(beta), decreasing = TRUE))
+  nnz <- which(bcs >= 0.999 * sum(abs(beta)))[1] + 1
   if (nnz >= n) {
     sigma2 <- 1
   } else {

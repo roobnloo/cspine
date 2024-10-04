@@ -22,14 +22,16 @@
             "extensions": [
                 "reditorsupport.r",
                 "RDebugger.r-debugger",
-                "gruntfuggly.todo-tree"
+                "gruntfuggly.todo-tree",
+                "GitHub.copilot"
             ],
             "settings": {
                 "r.rterm.linux": "/usr/local/bin/radian",
                 "r.lsp.path": "/usr/local/bin/R",
                 "r.sessionWatcher": true,
                 "r.plot.useHttpgd": true,
-                "r.bracketedPaste": true
+                "r.bracketedPaste": true,
+                "r.session.emulateRStudioAPI": false
             }
         }
     },
