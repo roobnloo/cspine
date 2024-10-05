@@ -2,28 +2,27 @@
 #'
 #' @param responses \eqn{n \times p} matrix of responses
 #' @param covariates \eqn{n \times q} matrix of covariates
-#' @param sglmixpath A path of sparse-group lasso mixing parameter with \eqn{0\leq \alpha \leq 1}. Default is \eqn{0.1, 0.2, \dotsc, 0.9}.
-#' @param nlambda The number of lambda values to use for cross-validation - default is 100.
+#' @param sglmixpath A path of sparse-group lasso mixing parameter with \eqn{0 < \alpha \leq 1}.
+#' @param nlambda The number of lambda values to use for cross-validation.
 #' @param lam_max The maximum lambda considered. Automatically calculated if NULL.
 #' @param lambda_factor The smallest value of lambda as a fraction of the maximum lambda.
-#' @param maxit The maximum number of iterations. Default is \eqn{3\times 10^6}.
-#' @param tol The convergence threshhold for optimization. Default is \eqn{10^{-10}}.
-#' @param nfolds Number of folds for cross-validation. Default is 5.
-#' @param verbose If TRUE, prints progress messages. Default is TRUE.
-#' @param ncores Runs the nodewise regressions in parallel using that many cores. Default is 1.
-#' @param adaptive Use adaptive weights when fitting nodewise regressions. Default is FALSE.
+#' @param maxit The maximum number of iterations.
+#' @param tol The convergence threshhold for optimization.
+#' @param nfolds Number of folds for cross-validation.
+#' @param ncores Runs the nodewise regressions in parallel using specified number cores. Defaults to no parallelization.
+#' @param adaptive Use adaptive weights when fitting nodewise regressions.
 #' @importFrom Matrix colMeans colSums
 #' @importFrom stats sd
 #' @importFrom sparsegl sparsegl
 #' @import parallel
 #' @export
-cspine <- function(responses, covariates, sglmixpath = seq(0.1, 0.9, 0.1), nlambda = 100,
+cspine <- function(responses, covariates, sglmixpath = seq(0.1, 1, 0.1), nlambda = 100,
                   lam_max = NULL, lambda_factor = 1e-4, maxit = 3e6, tol = 1e-8, nfolds = 5,
-                  verbose = TRUE, ncores = 1, adaptive = FALSE) {
+                  ncores = 1, adaptive = FALSE) {
   stopifnot(
     is.matrix(responses), is.matrix(covariates),
     nrow(responses) == nrow(covariates),
-    all(sglmixpath >= 0), all(sglmixpath <= 1)
+    all(sglmixpath > 0), all(sglmixpath <= 1)
   )
 
   p <- ncol(responses)

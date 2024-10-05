@@ -7,14 +7,13 @@
 cspine(
   responses,
   covariates,
-  sglmixpath = seq(0.1, 0.9, 0.1),
+  sglmixpath = seq(0.1, 1, 0.1),
   nlambda = 100,
   lam_max = NULL,
   lambda_factor = 1e-04,
   maxit = 3e+06,
   tol = 1e-08,
   nfolds = 5,
-  verbose = TRUE,
   ncores = 1,
   adaptive = FALSE
 )
@@ -24,25 +23,23 @@ cspine(
 
 \item{covariates}{\eqn{n \times q} matrix of covariates}
 
-\item{sglmixpath}{A path of sparse-group lasso mixing parameter with \eqn{0\leq \alpha \leq 1}. Default is \eqn{0.1, 0.2, \dotsc, 0.9}.}
+\item{sglmixpath}{A path of sparse-group lasso mixing parameter with \eqn{0 < \alpha \leq 1}.}
 
-\item{nlambda}{The number of lambda values to use for cross-validation - default is 100.}
+\item{nlambda}{The number of lambda values to use for cross-validation.}
 
 \item{lam_max}{The maximum lambda considered. Automatically calculated if NULL.}
 
 \item{lambda_factor}{The smallest value of lambda as a fraction of the maximum lambda.}
 
-\item{maxit}{The maximum number of iterations. Default is \eqn{3\times 10^6}.}
+\item{maxit}{The maximum number of iterations.}
 
-\item{tol}{The convergence threshhold for optimization. Default is \eqn{10^{-10}}.}
+\item{tol}{The convergence threshhold for optimization.}
 
-\item{nfolds}{Number of folds for cross-validation. Default is 5.}
+\item{nfolds}{Number of folds for cross-validation.}
 
-\item{verbose}{If TRUE, prints progress messages. Default is TRUE.}
+\item{ncores}{Runs the nodewise regressions in parallel using specified number cores. Defaults to no parallelization.}
 
-\item{ncores}{Runs the nodewise regressions in parallel using that many cores. Default is 1.}
-
-\item{adaptive}{Use adaptive weights when fitting nodewise regressions. Default is FALSE.}
+\item{adaptive}{Use adaptive weights when fitting nodewise regressions.}
 }
 \description{
 Run Covariate-adjusted Sparse Precision with Natural Estimation

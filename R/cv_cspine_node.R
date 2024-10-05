@@ -26,7 +26,7 @@ cv_cspine_node <- function(y, uw, p, q, nlambda, lam_max, lambda_factor, alpha,
       lambda = lambda,
       pf_group = pf_group,
       asparse = asparse,
-      standardize = TRUE, intercept = TRUE, eps = tol
+      eps = tol, maxit = maxit
     )
     cvm_mx[, asid] <- sgl1$cvm
     lambda_min_ind <- which.min(sgl1$cvm)
