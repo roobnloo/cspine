@@ -32,17 +32,15 @@ predict.cspine <- function(fit, u) {
   diag(omega) <- 1 / fit$sigma2
   omega <- Matrix::Diagonal(x = fit$sigma2) %*% omega
   eps <- 1e-10 # ensure stable inversion for prediction
-  while (TRUE) {
-    tryCatch(
-      {
-        solve(omega + eps * diag(nrow(omega)))
-        break
-      },
+  mu <- NULL
+  while (is.null(mu)) {
+    mu <- tryCatch(
+      solve(omega + eps * diag(nrow(omega)), fit$gamma %*% u),
       error = function(e) {
         eps <- eps * 10
+        NULL
       }
     )
   }
-  mu <- solve(omega + eps * diag(nrow(omega)), fit$gamma %*% u)
   return(list(precision = omega, mean = mu))
 }
