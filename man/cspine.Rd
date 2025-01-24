@@ -11,6 +11,7 @@ cspine(
   nlambda = 100,
   lam_max = NULL,
   lambda_factor = 1e-04,
+  symmetrize_rule = c("and", "or"),
   maxit = 3e+06,
   tol = 1e-08,
   nfolds = 5,
@@ -30,6 +31,8 @@ cspine(
 \item{lam_max}{The maximum lambda considered. Automatically calculated if NULL.}
 
 \item{lambda_factor}{The smallest value of lambda as a fraction of the maximum lambda.}
+
+\item{symmetrize_rule}{Which rule to use to symmetrize the precision matrix components.}
 
 \item{maxit}{The maximum number of iterations.}
 

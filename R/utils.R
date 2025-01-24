@@ -15,7 +15,7 @@ intxmx <- function(responses, covariates) {
 #' result_ij = result_ji is nonzero iff both mx_ij and mx_ji are nonzero,
 #' in which case we choose the smaller value in magnitude.
 #' @noRd
-symmetrize <- function(mx, rule = "and") {
+symmetrize <- function(mx, rule) {
   if (rule == "and") {
     result <- mx * (abs(mx) < t(abs(mx))) + t(mx) * (t(abs(mx)) < abs(mx))
   } else {

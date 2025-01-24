@@ -6,6 +6,7 @@
 #' @param nlambda The number of lambda values to use for cross-validation.
 #' @param lam_max The maximum lambda considered. Automatically calculated if NULL.
 #' @param lambda_factor The smallest value of lambda as a fraction of the maximum lambda.
+#' @param symmetrize_rule Which rule to use to symmetrize the precision matrix components.
 #' @param maxit The maximum number of iterations.
 #' @param tol The convergence threshhold for optimization.
 #' @param nfolds Number of folds for cross-validation.
@@ -17,13 +18,15 @@
 #' @import parallel
 #' @export
 cspine <- function(responses, covariates, sglmixpath = seq(0.1, 1, 0.1), nlambda = 100,
-                  lam_max = NULL, lambda_factor = 1e-4, maxit = 3e6, tol = 1e-8, nfolds = 5,
-                  ncores = 1, adaptive = FALSE) {
+                   lam_max = NULL, lambda_factor = 1e-4, symmetrize_rule = c("and", "or"),
+                   maxit = 3e6, tol = 1e-8, nfolds = 5,
+                   ncores = 1, adaptive = FALSE) {
   stopifnot(
     is.matrix(responses), is.matrix(covariates),
     nrow(responses) == nrow(covariates),
     all(sglmixpath > 0), all(sglmixpath <= 1)
   )
+  symmetrize_rule <- match.arg(symmetrize_rule)
 
   p <- ncol(responses)
   q <- ncol(covariates)
@@ -91,8 +94,9 @@ cspine <- function(responses, covariates, sglmixpath = seq(0.1, 1, 0.1), nlambda
     bhat_tens[i, -i, ] <- beta[i, ]
   }
 
-  for (h in seq_len(q + 1)) {
-    bhat_symm[, , h] <- symmetrize(-diag(1 / sigma2) %*% bhat_tens[, , h])
+  bhat_symm[, , 1] <- symmetrize(-diag(1 / sigma2) %*% bhat_tens[, , 1], "and")
+  for (h in seq(2, q + 1)) {
+    bhat_symm[, , h] <- symmetrize(-diag(1 / sigma2) %*% bhat_tens[, , h], symmetrize_rule)
   }
 
   outlist <- list(
