@@ -14,11 +14,11 @@
 #' @param adaptive Use adaptive weights when fitting nodewise regressions.
 #' @importFrom Matrix colMeans colSums
 #' @importFrom stats sd
-#' @importFrom sparsegl sparsegl
+#' @importFrom sglssnal sglssnal
 #' @import parallel
 #' @export
 cspine <- function(responses, covariates, sglmixpath = seq(0.1, 1, 0.1), nlambda = 100,
-                   lam_max = NULL, lambda_factor = 1e-4, symmetrize_rule = c("and", "or"),
+                   lam_max = NULL, lambda_factor = 1e-2, symmetrize_rule = c("and", "or"),
                    maxit = 3e6, tol = 1e-8, nfolds = 5,
                    ncores = 1, adaptive = FALSE) {
   stopifnot(
@@ -42,15 +42,15 @@ cspine <- function(responses, covariates, sglmixpath = seq(0.1, 1, 0.1), nlambda
   cv_lambda_idx <- numeric(p)
   cv_alpha_idx <- numeric(p)
 
-  cov_scale <- scale(covariates, scale = FALSE)
+  # cov_scale <- scale(covariates, scale = FALSE)
   intx <- intxmx(responses, covariates)
-  intx_scale <- scale(intx, scale = FALSE)
+  # intx_scale <- scale(intx, scale = FALSE)
 
   nodewise <- function(node) {
     y <- responses[, node] - mean(responses[, node])
-    intx_scale_node <- intx_scale[, -(seq(0, q) * p + node)]
+    intx_node <- intx[, -(seq(0, q) * p + node)]
     nodereg <- cv_cspine_node(
-      y, cbind(cov_scale, intx_scale_node), p, q, nlambda, lam_max, lambda_factor, sglmixpath,
+      y, cbind(covariates, intx_node), p, q, nlambda, lam_max, lambda_factor, sglmixpath,
       maxit, tol, nfolds
     )
     message(node, " ", appendLF = FALSE)

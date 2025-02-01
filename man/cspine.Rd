@@ -10,7 +10,7 @@ cspine(
   sglmixpath = seq(0.1, 1, 0.1),
   nlambda = 100,
   lam_max = NULL,
-  lambda_factor = 1e-04,
+  lambda_factor = 0.01,
   symmetrize_rule = c("and", "or"),
   maxit = 3e+06,
   tol = 1e-08,

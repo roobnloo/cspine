@@ -8,7 +8,7 @@ Authors@R:
 Maintainer: Robin Liu <r_liu@pstat.ucsb.edu>
 Description: Convex neighborhood selection for precision matrix estimation with covariate adjustment.
 License: MIT + file LICENSE
-Imports: Matrix, sparsegl
+Imports: Matrix, sglssnal
 Suggests: parallel
 RoxygenNote: 7.3.2
 Encoding: UTF-8
