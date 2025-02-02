@@ -30,6 +30,7 @@ cspine <- function(responses, covariates, sglmixpath = seq(0.1, 1, 0.1), nlambda
 
   p <- ncol(responses)
   q <- ncol(covariates)
+  n <- nrow(responses)
   bveclength <- (p - 1) * (q + 1)
 
   nsglmix <- length(sglmixpath)
@@ -37,33 +38,68 @@ cspine <- function(responses, covariates, sglmixpath = seq(0.1, 1, 0.1), nlambda
   beta <- matrix(nrow = p, ncol = bveclength)
   gamma <- matrix(nrow = p, ncol = q)
   cvm <- array(dim = c(nlambda, nsglmix, p))
+  cv_idx <- matrix(nrow = p, ncol = 2)
   sigma2 <- numeric(p)
   mse <- numeric(p)
-  cv_lambda_idx <- numeric(p)
-  cv_alpha_idx <- numeric(p)
 
-  # cov_scale <- scale(covariates, scale = FALSE)
-  intx <- intxmx(responses, covariates)
-  # intx_scale <- scale(intx, scale = FALSE)
+  sdu <- sqrt(Matrix::colSums(covariates^2) / n)
+  sdx <- sqrt(Matrix::colSums(responses^2) / n)
+  muu <- Matrix::colMeans(covariates)
+  mux <- Matrix::colMeans(responses)
+
+  uc <- sweep(covariates, 2, muu, "-")
+  uc <- sweep(uc, 2, sdu, "/")
+  ux <- sweep(responses, 2, mux, "-")
+  ux <- sweep(ux, 2, sdx, "/")
 
   nodewise <- function(node) {
-    y <- responses[, node] - mean(responses[, node])
-    intx_node <- intx[, -(seq(0, q) * p + node)]
+    y <- responses[, node]
+    intx_node <- intxmx(ux[, -node], uc)
     nodereg <- cv_cspine_node(
-      y, cbind(covariates, intx_node), p, q, nlambda, lam_max, lambda_factor, sglmixpath,
+      y, cbind(uc, intx_node), p, q, nlambda, lam_max, lambda_factor, sglmixpath,
       maxit, tol, nfolds
     )
+    muxj <- mux[-node]
+    sdxj <- sdx[-node]
+    gamma <- nodereg$gamma
+    beta <- nodereg$beta
+    temp <- sapply(
+      1:q, \(h) sum(beta[seq((p - 1) * h + 1, (p - 1) * (h + 1))] * muxj / sdxj)
+    )
+    gamma_tilde <- (gamma - temp) / sdu
+
+    # for fixed k, index over blocks h = 1 to q
+    temp <- sapply(
+      1:(p - 1), \(k) sum(beta[p - 1 + k + seq(0, q - 1) * (p - 1)] * muu / sdu)
+    )
+    beta_tilde <- beta
+    beta_tilde[1:(p - 1)] <- (beta_tilde[1:(p - 1)] - temp) / sdxj
+    for (h in seq_len(q)) {
+      beta_tilde[(p - 1) * h + 1:(p - 1)] <- beta_tilde[(p - 1) * h + 1:(p - 1)] / (sdu[h] * sdxj)
+    }
+
+    gamma0_tilde <- mux[node] + nodereg$gamma0 - sum(gamma * muu / sdu) - sum(beta[1:(p - 1)] * muxj / sdxj)
+    gamma0_tilde <- gamma0_tilde +
+      sum(Reduce(c, lapply(1:q, \(h) muu[h] * muxj / (sdu[h] * sdxj))) * beta[-(1:(p - 1))])
+
+    # hard-threshold for numerical stability
+    gamma_tilde[abs(gamma_tilde) < 1e-9] <- 0
+    beta_tilde[abs(beta_tilde) < 1e-9] <- 0
+    if (abs(gamma0_tilde) < 1e-9) {
+      gamma0_tilde <- 0
+    }
+
     message(node, " ", appendLF = FALSE)
 
     return(list(
-      gamma = nodereg$gamma,
-      beta = nodereg$beta,
+      gamma0 = gamma0_tilde,
+      gamma = gamma_tilde,
+      beta = beta_tilde,
       sigma2 = nodereg$sigma2,
       lambda = nodereg$lambda,
       mse = nodereg$mse,
       cvm = nodereg$cvm,
-      cv_lambda_idx = nodereg$cv_lambda_idx,
-      cv_alpha_idx = nodereg$cv_alpha_idx
+      cv_idx = nodereg$cv_idx
     ))
   }
 
@@ -82,8 +118,7 @@ cspine <- function(responses, covariates, sglmixpath = seq(0.1, 1, 0.1), nlambda
     lambda[, node] <- reg_result[[node]]$lambda
     mse[node] <- reg_result[[node]]$mse
     cvm[, , node] <- reg_result[[node]]$cvm
-    cv_lambda_idx[node] <- reg_result[[node]]$cv_lambda_idx
-    cv_alpha_idx[node] <- reg_result[[node]]$cv_alpha_idx
+    cv_idx[node, ] <- reg_result[[node]]$cv_idx
   }
 
   message("\nFinished regressions.")
@@ -108,8 +143,7 @@ cspine <- function(responses, covariates, sglmixpath = seq(0.1, 1, 0.1), nlambda
     lambda = lambda,
     alpha = sglmixpath,
     cvm = cvm,
-    cv_lambda_idx = cv_lambda_idx,
-    cv_gmix_idx = cv_alpha_idx
+    cv_idx = cv_idx
   )
   class(outlist) <- "cspine"
 
