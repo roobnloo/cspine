@@ -42,14 +42,16 @@ cspine <- function(responses, covariates, sglmixpath = seq(0.1, 1, 0.1), nlambda
   sigma2 <- numeric(p)
   mse <- numeric(p)
 
-  sdu <- sqrt(Matrix::colSums(covariates^2) / n)
-  sdx <- sqrt(Matrix::colSums(responses^2) / n)
   muu <- Matrix::colMeans(covariates)
-  mux <- Matrix::colMeans(responses)
-
   uc <- sweep(covariates, 2, muu, "-")
+  sdu <- sqrt(Matrix::colSums(uc^2) / n)
+  sdu[abs(sdu) < 1e-9] <- 1
   uc <- sweep(uc, 2, sdu, "/")
+
+  mux <- Matrix::colMeans(responses)
   ux <- sweep(responses, 2, mux, "-")
+  sdx <- sqrt(Matrix::colSums(ux^2) / n)
+  sdx[abs(sdx) < 1e-9] <- 1
   ux <- sweep(ux, 2, sdx, "/")
 
   nodewise <- function(node) {
