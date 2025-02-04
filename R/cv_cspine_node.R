@@ -16,7 +16,11 @@ cv_cspine_node <- function(y, uw, p, q, nlambda, lam_max, lambda_factor, alpha,
   grp_idx <- rbind(start_ids, end_ids)
   lambda <- numeric(nlambda)
   if (is.null(lam_max)) {
-    lam_max <- norm(crossprod(uwc, yc), type = "I")
+    amin <- min(alpha)
+    if (amin == 0) {
+      amin <- 1
+    }
+    lam_max <- norm(crossprod(uwc, yc), type = "I") / amin
   }
   lambda <- lam_max * exp(seq(log(1), log(lambda_factor), length = nlambda))
   pf_group <- c(0, 0, rep(1, q))

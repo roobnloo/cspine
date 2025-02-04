@@ -18,7 +18,7 @@
 #' @import parallel
 #' @export
 cspine <- function(responses, covariates, sglmixpath = seq(0.1, 1, 0.1), nlambda = 100,
-                   lam_max = NULL, lambda_factor = 1e-2, symmetrize_rule = c("and", "or"),
+                   lam_max = NULL, lambda_factor = 1e-3, symmetrize_rule = c("and", "or"),
                    maxit = 3e6, tol = 1e-8, nfolds = 5,
                    ncores = 1, adaptive = FALSE) {
   stopifnot(
