@@ -4,29 +4,46 @@ cv_cspine_node <- function(y, uw, p, q, nlambda, lam_max, lambda_factor, alpha,
   nvars <- q + (p - 1) * (q + 1)
   nalpha <- length(alpha)
 
+  muy <- mean(y)
+  muuw <- Matrix::colMeans(uw)
+
+  # This centering allows us to not include an intercept in the regression.
+  yc <- y - muy
+  uwc <- sweep(uw, 2, muuw, "-")
+
+  # Convert to format accepted by sparsegl (base matrix or sparseMatrix)
+  if (!inherits(uwc, "sparseMatrix") && !is.matrix(uwc)) {
+    uwc <- as.matrix(uwc)
+  }
+
   foldid <- cut(sample(seq_len(n)), nfolds, labels = FALSE)
   groupid <- c(rep(0, q), rep(1:(q + 1), each = p - 1)) + 1
   cvm_mx <- matrix(0, nrow = nlambda, ncol = nalpha)
   coefs <- matrix(nrow = nvars, ncol = nalpha)
   lambda <- numeric(nlambda)
   mse <- numeric(nalpha)
-  uws <- as.matrix(uw %*% Matrix::Diagonal(x = 1 / sqrt(Matrix::colSums(uw^2))))
   if (is.null(lam_max)) {
-    lam_max <- max(abs(crossprod(uws, y)))
+    amin <- min(alpha)
+    if (amin == 0) {
+      amin <- 1
+    }
+    lam_max <- Matrix::norm(crossprod(uwc, yc), type = "I") / (n * amin)
   }
   lambda <- lam_max * exp(seq(log(1), log(lambda_factor), length = nlambda))
 
   for (asid in seq_along(alpha)) {
     asparse <- alpha[asid]
-    pf_group <- c(0, 0, rep(1, q))
+    pf_group <- c(0, 0, rep(sqrt(p - 1), q))
     sgl1 <- sparsegl::cv.sparsegl(
-      uw, y,
+      uwc, yc,
       group = groupid,
       foldid = foldid,
       lambda = lambda,
       pf_group = pf_group,
       asparse = asparse,
-      eps = tol, maxit = maxit
+      eps = tol, maxit = maxit,
+      intercept = FALSE,
+      standardize = FALSE
     )
     cvm_mx[, asid] <- sgl1$cvm
     lambda_min_ind <- which.min(sgl1$cvm)
@@ -50,13 +67,13 @@ cv_cspine_node <- function(y, uw, p, q, nlambda, lam_max, lambda_factor, alpha,
   }
 
   return(list(
+    gamma0 = muy - muuw %*% c(gamma, beta),
     gamma = gamma,
     beta = beta,
     sigma2 = sigma2,
     lambda = lambda,
     mse = mse[alpha_min_ind],
     cvm = cvm_mx,
-    cv_lambda_idx = cv_ind[1],
-    cv_alpha_idx = cv_ind[2]
+    cv_idx = cv_ind
   ))
 }

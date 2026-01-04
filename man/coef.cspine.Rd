@@ -4,10 +4,12 @@
 \alias{coef.cspine}
 \title{Extract estimated coefficients from a 'cspine' object}
 \usage{
-\method{coef}{cspine}(fit)
+\method{coef}{cspine}(object, ...)
 }
 \arguments{
-\item{fit}{An object of class [cspine].}
+\item{object}{An object of class [cspine].}
+
+\item{...}{Additional arguments (not used).}
 }
 \value{
 A list with components 'beta', an array of precision matrix

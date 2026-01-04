@@ -4,12 +4,14 @@
 \alias{predict.cspine}
 \title{Predict from a 'cspine' object}
 \usage{
-\method{predict}{cspine}(fit, u)
+\method{predict}{cspine}(object, u, ...)
 }
 \arguments{
-\item{fit}{An object of class [cspine].}
+\item{object}{An object of class [cspine].}
 
 \item{u}{A vector of covariates.}
+
+\item{...}{Additional arguments (not used).}
 }
 \value{
 A list with components 'precision', the predicted precision matrix,
