@@ -12,6 +12,8 @@
 #' @param nfolds Number of folds for cross-validation.
 #' @param ncores Runs the nodewise regressions in parallel using specified number cores. Defaults to no parallelization.
 #' @param adaptive Use adaptive weights when fitting nodewise regressions.
+#' @param std_intx If TRUE, properly standardize interaction terms (center and scale each interaction column).
+#'   If FALSE (default), uses simple L2 column normalization.
 #' @importFrom Matrix colMeans colSums Diagonal norm t
 #' @importFrom stats sd
 #' @importFrom sparsegl sparsegl
@@ -20,11 +22,12 @@
 cspine <- function(responses, covariates, sglmixpath = seq(0.1, 1, 0.1), nlambda = 100,
                    lam_max = NULL, lambda_factor = 1e-2, symmetrize_rule = c("and", "or"),
                    maxit = 3e6, tol = 1e-8, nfolds = 5,
-                   ncores = 1, adaptive = FALSE) {
+                   ncores = 1, adaptive = FALSE, std_intx = FALSE) {
   stopifnot(
     is.matrix(responses), is.matrix(covariates),
     nrow(responses) == nrow(covariates),
-    all(sglmixpath > 0), all(sglmixpath <= 1)
+    all(sglmixpath > 0), all(sglmixpath <= 1),
+    is.logical(std_intx)
   )
   symmetrize_rule <- match.arg(symmetrize_rule)
 
@@ -48,122 +51,148 @@ cspine <- function(responses, covariates, sglmixpath = seq(0.1, 1, 0.1), nlambda
     x_raw <- responses[, -node, drop = FALSE]
     u_raw <- covariates
 
-    # Compute means
-    muy <- mean(y_raw)
-    mux_j <- Matrix::colMeans(x_raw)
-    muu <- Matrix::colMeans(u_raw)
+    if (std_intx) {
+      # Compute means
+      muy <- mean(y_raw)
+      mux_j <- Matrix::colMeans(x_raw)
+      muu <- Matrix::colMeans(u_raw)
 
-    # Center variables
-    y_centered <- y_raw - muy
-    x_centered <- sweep(x_raw, 2, mux_j, "-")
-    u_centered <- sweep(u_raw, 2, muu, "-")
+      # Center variables
+      y_centered <- y_raw - muy
+      x_centered <- sweep(x_raw, 2, mux_j, "-")
+      u_centered <- sweep(u_raw, 2, muu, "-")
 
-    # Compute standard deviations
-    sdy <- sqrt(sum(y_centered^2) / n)
-    sdx_j <- sqrt(Matrix::colSums(x_centered^2) / n)
-    sdu <- sqrt(Matrix::colSums(u_centered^2) / n)
+      # Compute standard deviations
+      sdy <- sqrt(sum(y_centered^2) / n)
+      sdx_j <- sqrt(Matrix::colSums(x_centered^2) / n)
+      sdu <- sqrt(Matrix::colSums(u_centered^2) / n)
 
-    # Prevent division by zero
-    if (sdy < 1e-9) sdy <- 1
-    sdx_j[sdx_j < 1e-9] <- 1
-    sdu[sdu < 1e-9] <- 1
+      # Prevent division by zero
+      if (sdy < 1e-9) sdy <- 1
+      sdx_j[sdx_j < 1e-9] <- 1
+      sdu[sdu < 1e-9] <- 1
 
-    # Standardize main effects: tilde_u and tilde_x
-    u_std <- u_centered %*% Matrix::Diagonal(x = 1 / sdu)
-    x_std <- x_centered %*% Matrix::Diagonal(x = 1 / sdx_j)
+      # Standardize main effects: tilde_u and tilde_x
+      u_std <- u_centered %*% Matrix::Diagonal(x = 1 / sdu)
+      x_std <- x_centered %*% Matrix::Diagonal(x = 1 / sdx_j)
 
-    # Form interaction columns w_kh = (u_h - mean(u_h)) * (x_k - mean(x_k))
-    # Store means and sds of w_kh for back-transformation
-    w_means <- matrix(0, nrow = p - 1, ncol = q)
-    w_sds <- matrix(0, nrow = p - 1, ncol = q)
-    w_std_list <- list()
+      # Form interaction columns w_kh = (u_h - mean(u_h)) * (x_k - mean(x_k))
+      # Store means and sds of w_kh for back-transformation
+      w_means <- matrix(0, nrow = p - 1, ncol = q)
+      w_sds <- matrix(0, nrow = p - 1, ncol = q)
+      w_std_list <- list()
 
-    for (h in seq_len(q)) {
-      for (k in seq_len(p - 1)) {
-        # Form w_kh (already centered since u and x are centered)
-        w_kh <- u_centered[, h] * x_centered[, k]
+      for (h in seq_len(q)) {
+        for (k in seq_len(p - 1)) {
+          # Form w_kh (already centered since u and x are centered)
+          w_kh <- u_centered[, h] * x_centered[, k]
 
-        # Compute mean and sd of w_kh
-        w_means[k, h] <- mean(w_kh)
-        w_centered <- w_kh - w_means[k, h]
-        w_sds[k, h] <- sqrt(sum(w_centered^2) / n)
+          # Compute mean and sd of w_kh
+          w_means[k, h] <- mean(w_kh)
+          w_centered <- w_kh - w_means[k, h]
+          w_sds[k, h] <- sqrt(sum(w_centered^2) / n)
 
-        # Prevent division by zero
-        if (w_sds[k, h] < 1e-9) w_sds[k, h] <- 1
+          # Prevent division by zero
+          if (w_sds[k, h] < 1e-9) w_sds[k, h] <- 1
 
-        # Standardize w_kh
-        w_std_list[[(h - 1) * (p - 1) + k]] <- w_centered / w_sds[k, h]
+          # Standardize w_kh
+          w_std_list[[(h - 1) * (p - 1) + k]] <- w_centered / w_sds[k, h]
+        }
       }
-    }
 
-    # Combine all standardized interaction columns
-    w_std <- do.call(cbind, w_std_list)
+      # Combine all standardized interaction columns
+      w_std <- do.call(cbind, w_std_list)
 
-    # Form full design matrix: [tilde_u, tilde_x, tilde_w]
-    design_std <- cbind(u_std, x_std, w_std)
+      # Form full design matrix: [tilde_u, tilde_x, tilde_w]
+      design_std <- cbind(u_std, x_std, w_std)
 
-    # Fit regression on standardized data
-    nodereg <- cv_cspine_node(
-      y_centered, design_std, p, q, nlambda, lam_max, lambda_factor, sglmixpath,
-      maxit, tol, nfolds
-    )
+      # Fit regression on standardized data
+      nodereg <- cv_cspine_node(
+        y_centered, design_std, p, q, nlambda, lam_max, lambda_factor, sglmixpath,
+        maxit, tol, nfolds
+      )
 
-    # Extract standardized coefficients
-    gamma_std <- nodereg$gamma
-    beta_std <- nodereg$beta
-    gamma0_std <- nodereg$gamma0
+      # Extract standardized coefficients
+      gamma_std <- nodereg$gamma
+      beta_std <- nodereg$beta
+      gamma0_std <- nodereg$gamma0
 
-    # Back-transform to original scale
-    # beta_kh = beta_kh^std / sd(w_kh)
-    beta_unstd <- numeric(length(beta_std))
+      # Back-transform to original scale
+      # beta_kh = beta_kh^std / sd(w_kh)
+      beta_unstd <- numeric(length(beta_std))
 
-    # Main effect betas: beta_k0^std (first p-1 elements)
-    # Interaction betas: beta_kh^std (remaining elements, organized as blocks of p-1)
+      # Main effect betas: beta_k0^std (first p-1 elements)
+      # Interaction betas: beta_kh^std (remaining elements, organized as blocks of p-1)
 
-    # Transform interaction coefficients first (we need these for main effects)
-    beta_interact_unstd <- matrix(0, nrow = p - 1, ncol = q)
-    for (h in seq_len(q)) {
-      for (k in seq_len(p - 1)) {
-        idx <- (p - 1) + (h - 1) * (p - 1) + k
-        beta_interact_unstd[k, h] <- beta_std[idx] / w_sds[k, h]
+      # Transform interaction coefficients first (we need these for main effects)
+      beta_interact_unstd <- matrix(0, nrow = p - 1, ncol = q)
+      for (h in seq_len(q)) {
+        for (k in seq_len(p - 1)) {
+          idx <- (p - 1) + (h - 1) * (p - 1) + k
+          beta_interact_unstd[k, h] <- beta_std[idx] / w_sds[k, h]
+        }
       }
-    }
 
-    # Transform gamma_h: gamma_h = gamma_h^std / sd(u_h) - sum_k mean(x_k) * beta_kh^std / sd(w_kh)
-    gamma_unstd <- numeric(q)
-    for (h in seq_len(q)) {
-      gamma_unstd[h] <- gamma_std[h] / sdu[h] - sum(mux_j * beta_interact_unstd[, h])
-    }
-
-    # Transform beta_k0: beta_k0 = beta_k0^std / sd(x_k) - sum_h mean(u_h) * beta_kh^std / sd(w_kh)
-    beta_main_unstd <- numeric(p - 1)
-    for (k in seq_len(p - 1)) {
-      beta_main_unstd[k] <- beta_std[k] / sdx_j[k] - sum(muu * beta_interact_unstd[k, ])
-    }
-
-    # Transform intercept
-    gamma0_unstd <- muy + gamma0_std
-    gamma0_unstd <- gamma0_unstd - sum(muu * gamma_unstd)
-    gamma0_unstd <- gamma0_unstd - sum(mux_j * beta_main_unstd)
-
-    # Add the interaction correction term: sum_{h,k} (mean(u_h)*mean(x_k) - mean(w_kh)) * beta_kh^std / sd(w_kh)
-    for (h in seq_len(q)) {
-      for (k in seq_len(p - 1)) {
-        gamma0_unstd <- gamma0_unstd + (muu[h] * mux_j[k] - w_means[k, h]) * beta_interact_unstd[k, h]
+      # Transform gamma_h: gamma_h = gamma_h^std / sd(u_h) - sum_k mean(x_k) * beta_kh^std / sd(w_kh)
+      gamma_unstd <- numeric(q)
+      for (h in seq_len(q)) {
+        gamma_unstd[h] <- gamma_std[h] / sdu[h] - sum(mux_j * beta_interact_unstd[, h])
       }
-    }
 
-    # Reassemble beta vector: [beta_main, beta_interactions]
-    beta_unstd[1:(p - 1)] <- beta_main_unstd
-    for (h in seq_len(q)) {
-      beta_unstd[(p - 1) + (h - 1) * (p - 1) + 1:(p - 1)] <- beta_interact_unstd[, h]
-    }
+      # Transform beta_k0: beta_k0 = beta_k0^std / sd(x_k) - sum_h mean(u_h) * beta_kh^std / sd(w_kh)
+      beta_main_unstd <- numeric(p - 1)
+      for (k in seq_len(p - 1)) {
+        beta_main_unstd[k] <- beta_std[k] / sdx_j[k] - sum(muu * beta_interact_unstd[k, ])
+      }
 
-    # Hard-threshold for numerical stability
-    gamma_unstd[abs(gamma_unstd) < 1e-9] <- 0
-    beta_unstd[abs(beta_unstd) < 1e-9] <- 0
-    if (abs(gamma0_unstd) < 1e-9) {
-      gamma0_unstd <- 0
+      # Transform intercept
+      gamma0_unstd <- muy + gamma0_std
+      gamma0_unstd <- gamma0_unstd - sum(muu * gamma_unstd)
+      gamma0_unstd <- gamma0_unstd - sum(mux_j * beta_main_unstd)
+
+      # Add the interaction correction term: sum_{h,k} (mean(u_h)*mean(x_k) - mean(w_kh)) * beta_kh^std / sd(w_kh)
+      for (h in seq_len(q)) {
+        for (k in seq_len(p - 1)) {
+          gamma0_unstd <- gamma0_unstd + (muu[h] * mux_j[k] - w_means[k, h]) * beta_interact_unstd[k, h]
+        }
+      }
+
+      # Reassemble beta vector: [beta_main, beta_interactions]
+      beta_unstd[1:(p - 1)] <- beta_main_unstd
+      for (h in seq_len(q)) {
+        beta_unstd[(p - 1) + (h - 1) * (p - 1) + 1:(p - 1)] <- beta_interact_unstd[, h]
+      }
+
+      # Hard-threshold for numerical stability
+      gamma_unstd[abs(gamma_unstd) < 1e-9] <- 0
+      beta_unstd[abs(beta_unstd) < 1e-9] <- 0
+      if (abs(gamma0_unstd) < 1e-9) gamma0_unstd <- 0
+    } else {
+      # Simple method: L2 column normalization (no proper interaction standardization)
+      # Form full design matrix: [u, x, x*u1, ..., x*uq]
+      iU <- cbind(1, u_raw)
+      intmx <- Reduce(cbind, lapply(seq_len(q + 1), \(j) x_raw * iU[, j]))
+      uw_raw <- cbind(u_raw, intmx)
+
+      # L2 normalize each column
+      col_norms <- sqrt(Matrix::colSums(uw_raw^2))
+      col_norms[col_norms < 1e-9] <- 1
+      uw_std <- as.matrix(uw_raw %*% Matrix::Diagonal(x = 1 / col_norms))
+
+      nodereg <- cv_cspine_node(
+        y_raw, uw_std, p, q, nlambda, lam_max, lambda_factor, sglmixpath,
+        maxit, tol, nfolds
+      )
+
+      # Back-transform: divide by L2 norms of original columns
+      gamma_unstd <- nodereg$gamma / col_norms[seq_len(q)]
+      beta_unstd <- nodereg$beta / col_norms[(q + 1):(q + (p - 1) * (q + 1))]
+      gamma0_unstd <- nodereg$gamma0
+
+      # Hard-threshold for numerical stability
+      gamma_unstd[abs(gamma_unstd) < 1e-9] <- 0
+      beta_unstd[abs(beta_unstd) < 1e-9] <- 0
+      if (abs(gamma0_unstd) < 1e-9) gamma0_unstd <- 0
     }
 
     message(node, " ", appendLF = FALSE)

@@ -16,7 +16,8 @@ cspine(
   tol = 1e-08,
   nfolds = 5,
   ncores = 1,
-  adaptive = FALSE
+  adaptive = FALSE,
+  std_intx = FALSE
 )
 }
 \arguments{
@@ -43,6 +44,9 @@ cspine(
 \item{ncores}{Runs the nodewise regressions in parallel using specified number cores. Defaults to no parallelization.}
 
 \item{adaptive}{Use adaptive weights when fitting nodewise regressions.}
+
+\item{std_intx}{If TRUE, properly standardize interaction terms (center and scale each interaction column).
+If FALSE (default), uses simple L2 column normalization.}
 }
 \description{
 Run Covariate-adjusted Sparse Precision with Natural Estimation
